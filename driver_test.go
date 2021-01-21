@@ -221,6 +221,30 @@ func TestEmptyQuery(t *testing.T) {
 	})
 }
 
+func TestInMemorySort(t *testing.T) {
+	runTests(t, dsn, func(dbt *DBTest) {
+		dbt.mustExec("DROP TABLE IF EXISTS test")
+		dbt.mustExec("CREATE TABLE test (id BIGINT(20), data JSON)")
+		longJSON := fmt.Sprintf(`{"field": "%s"}`, strings.Repeat("value", 9999))
+		for i := 0; i < 100; i++ {
+			dbt.mustExec("INSERT INTO test VALUES (?, ?)", i, longJSON)
+		}
+
+		problemQuery := "SELECT COUNT(*) AS matches FROM test GROUP BY id, data ORDER BY matches DESC LIMIT 1024;"
+		rows := dbt.mustQuery(problemQuery)
+		count := 0
+		for rows.Next() {
+			count++
+		}
+		rows.Close()
+		if count != 100 {
+			dbt.Fatalf("expected 100 sorted rows, got %d", count)
+		}
+
+		dbt.mustExec("DROP TABLE IF EXISTS test")
+	})
+}
+
 func TestCRUD(t *testing.T) {
 	runTests(t, dsn, func(dbt *DBTest) {
 		// Create Table
